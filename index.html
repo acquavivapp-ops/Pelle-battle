@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, orientation=landscape">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Pelle Battle</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 100%; height: 100%;
+    background: #000;
+    overflow: hidden;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  #gameCanvas {
+    display: block;
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    image-rendering: pixelated;
+  }
+  #ui {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+  }
+  #hud {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 8px 12px 0;
+    gap: 8px;
+  }
+  .fighter-hud {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    flex: 1;
+  }
+  .fighter-hud.right { align-items: flex-end; }
+  .fighter-name {
+    font-family: 'Arial Black', sans-serif;
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #fff;
+    text-shadow: 1px 1px 0 #000;
+  }
+  .hp-bar-bg {
+    width: 100%;
+    height: 14px;
+    background: #333;
+    border: 2px solid #000;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .hp-bar {
+    height: 100%;
+    transition: width 0.15s ease;
+    border-radius: 1px;
+  }
+  #hp1 { background: linear-gradient(180deg, #f0f 0%, #c00 100%); }
+  #hp2 { background: linear-gradient(180deg, #f0f 0%, #c00 100%); margin-left: auto; }
+  .special-bar-bg {
+    width: 100%;
+    height: 7px;
+    background: #222;
+    border: 1px solid #000;
+    border-radius: 1px;
+    overflow: hidden;
+  }
+  .special-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #00f 0%, #0ff 100%);
+    transition: width 0.2s ease;
+  }
+  #timer-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 50px;
+  }
+  #timer {
+    font-family: 'Arial Black', sans-serif;
+    font-size: 24px;
+    font-weight: 900;
+    color: #ff0;
+    text-shadow: 0 0 8px #f80, 2px 2px 0 #000;
+    line-height: 1;
+  }
+  #round-display {
+    font-family: 'Arial Black', sans-serif;
+    font-size: 9px;
+    color: #fff;
+    text-shadow: 1px 1px 0 #000;
+    letter-spacing: 1px;
+  }
+  #controls {
+    position: absolute;
+    bottom: 0; left: 0;
+    width: 100%;
+    pointer-events: none;
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 10px;
+    gap: 8px;
+  }
+  .ctrl-group {
+    display: flex;
+    gap: 5px;
+    align-items: flex-end;
+    pointer-events: all;
+  }
+  .btn {
+    width: 48px; height: 48px;
+    border-radius: 50%;
+    border: 3px solid rgba(255,255,255,0.5);
+    font-family: 'Arial Black', sans-serif;
+    font-size: 9px;
+    font-weight: 900;
+    color: #fff;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    text-align: center;
+    line-height: 1.1;
+    text-shadow: 1px 1px 0 #000;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform 0.08s, opacity 0.08s;
+    text-transform: uppercase;
+  }
+  .btn:active { transform: scale(0.88); opacity: 0.8; }
+  .btn-move { background: rgba(0,0,0,0.5); width: 42px; height: 42px; font-size: 18px; }
+  .btn-punch { background: rgba(220,80,0,0.75); }
+  .btn-kick { background: rgba(200,0,200,0.75); }
+  .btn-special { background: rgba(0,100,220,0.75); font-size: 8px; }
+  .btn-super { background: rgba(200,160,0,0.85); font-size: 8px; }
+  .btn-block { background: rgba(0,150,0,0.75); font-size: 8px; }
+  .dpad {
+    display: grid;
+    grid-template-columns: 42px 42px 42px;
+    grid-template-rows: 42px 42px 42px;
+    gap: 2px;
+  }
+  .dpad .btn-move { border-radius: 6px; }
+  .dpad .empty { width: 42px; height: 42px; }
+  #overlay {
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.85);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    pointer-events: all;
+  }
+  #overlay h1 {
+    font-family: 'Arial Black', sans-serif;
+    font-size: clamp(28px, 6vw, 56px);
+    color: #ff0;
+    text-shadow: 0 0 20px #f80, 3px 3px 0 #000;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    text-align: center;
+  }
+  #overlay .subtitle {
+    font-family: 'Arial Black', sans-serif;
+    font-size: clamp(12px, 2.5vw, 20px);
+    color: #fff;
+    text-shadow: 2px 2px 0 #000;
+    margin: 8px 0 20px;
+    text-align: center;
+  }
+  .start-btn {
+    padding: 14px 40px;
+    background: linear-gradient(180deg, #f80 0%, #c40 100%);
+    border: 3px solid #ff0;
+    border-radius: 8px;
+    font-family: 'Arial Black', sans-serif;
+    font-size: clamp(14px, 3vw, 22px);
+    color: #fff;
+    text-shadow: 2px 2px 0 #000;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin: 6px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .start-btn:hover { background: linear-gradient(180deg, #fa0 0%, #e50 100%); }
+  #flash-overlay {
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    pointer-events: none;
+    opacity: 0;
+    z-index: 50;
+  }
+  #announce {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-family: 'Arial Black', sans-serif;
+    font-size: clamp(22px, 5vw, 48px);
+    font-weight: 900;
+    color: #fff;
+    text-shadow: 0 0 20px #f00, 4px 4px 0 #000;
+    text-transform: uppercase;
+    letter-spacing: 4px;
+    text-align: center;
+    pointer-events: none;
+    opacity: 0;
+    z-index: 60;
+    transition: opacity 0.2s;
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+<canvas id="gameCanvas"></canvas>
+
+<div id="flash-overlay"></div>
+<div id="announce"></div>
+
+<div id="ui">
+  <div id="hud">
+    <div class="fighter-hud">
+      <div class="fighter-name" id="name1">Fred</div>
+      <div class="hp-bar-bg"><div class="hp-bar" id="hp1" style="width:100%"></div></div>
+      <div class="special-bar-bg"><div class="special-bar" id="sp1" style="width:0%"></div></div>
+    </div>
+    <div id="timer-box">
+      <div id="round-display">ROUND 1</div>
+      <div id="timer">99</div>
+    </div>
+    <div class="fighter-hud right">
+      <div class="fighter-name" id="name2">Pascal</div>
+      <div class="hp-bar-bg"><div class="hp-bar" id="hp2" style="width:100%"></div></div>
+      <div class="special-bar-bg"><div class="special-bar" id="sp2" style="width:0%"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- P1 controls (left) -->
+<div id="controls">
+  <div class="ctrl-group" id="p1-controls">
+    <div class="dpad" id="dpad1">
+      <div class="empty"></div>
+      <div class="btn btn-move" id="p1-up">▲</div>
+      <div class="empty"></div>
+      <div class="btn btn-move" id="p1-left">◀</div>
+      <div class="empty"></div>
+      <div class="btn btn-move" id="p1-right">▶</div>
+      <div class="empty"></div>
+      <div class="btn btn-move" id="p1-down">▼</div>
+      <div class="empty"></div>
+    </div>
+  </div>
+  <div class="ctrl-group" id="p1-actions" style="flex-direction:column; align-items:flex-start; gap:4px;">
+    <div style="display:flex;gap:4px;">
+      <div class="btn btn-block" id="p1-block">BLOC</div>
+      <div class="btn btn-special" id="p1-special">SPEC</div>
+      <div class="btn btn-super" id="p1-super">ULTRA</div>
+    </div>
+    <div style="display:flex;gap:4px;">
+      <div class="btn btn-punch" id="p1-punch">GODET</div>
+      <div class="btn btn-kick" id="p1-kick">CHOC</div>
+    </div>
+  </div>
+
+  <div class="ctrl-group" id="p2-actions" style="flex-direction:column; align-items:flex-end; gap:4px;">
+    <div style="display:flex;gap:4px;">
+      <div class="btn btn-super" id="p2-super">ULTRA</div>
+      <div class="btn btn-special" id="p2-special">SPEC</div>
+      <div class="btn btn-block" id="p2-block">BLOC</div>
+    </div>
+    <div style="display:flex;gap:4px;">
+      <div class="btn btn-kick" id="p2-kick">CHOC</div>
+      <div class="btn btn-punch" id="p2-punch">GODET</div>
+    </div>
+  </div>
+  <div class="ctrl-group" id="p2-controls">
+    <div class="dpad" id="dpad2">
+      <div class="empty"></div>
+      <div class="btn btn-move" id="p2-up">▲</div>
+      <div class="empty"></div>
+      <div class="btn btn-move" id="p2-left">◀</div>
+      <div class="empty"></div>
+      <div class="btn btn-move" id="p2-right">▶</div>
+      <div class="empty"></div>
+      <div class="btn btn-move" id="p2-down">▼</div>
+      <div class="empty"></div>
+    </div>
+  </div>
+</div>
+
+<div id="overlay">
+  <h1>⚙ PELLE BATTLE ⚙</h1>
+  <div class="subtitle">Fred vs Pascal — Combat de Pelleteuses</div>
+  <button class="start-btn" id="btn-1p">1 JOUEUR (vs IA)</button>
+  <button class="start-btn" id="btn-2p">2 JOUEURS</button>
+</div>
+
+<script src="game.js"></script>
+</body>
+</html>
